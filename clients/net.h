@@ -1,10 +1,19 @@
 #include <iostream>
 #include <string>
 
+#if defined(_WIN32) || defined(_WIN64)
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment (lib, "Ws2_32.lib")
-
+#elif defined(__linux__)
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdint.h>
+#endif
 class net
 {
 public:
@@ -24,8 +33,12 @@ private:
    	static const int pkg_length = 1024;
 	char package[pkg_length];
     int opStatus;
+    sockaddr_in servInfo;
+#if defined(_WIN32) || defined(_WIN64)
     in_addr ip_to_num;
     WSADATA wsaData;
     SOCKET sockCli;
-    sockaddr_in servInfo;
+#elif defined(__linux__)
+    int sockCli;
+#endif
 };

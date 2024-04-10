@@ -3,11 +3,20 @@
 #include <string>
 #include <future>
 #include <chrono>
+
+#if defined (_WIN32) || defined (_WIN64)
 #include <WinSock2.h>
 #include <ws2tcpip.h>
 #pragma comment (lib, "Ws2_32.lib")
-#pragma comment(lib, "Mswsock.lib") 
+#pragma comment(lib, "Mswsock.lib")
 
+#elif defined (__linux__)
+#include <string.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#endif
 
 class net
 {
@@ -20,13 +29,29 @@ private:
     static const int cli_id_length = 64;
     struct netObj
     {
-        netObj(): sock(0) { addrSize = sizeof(addr); ZeroMemory(&addr, addrSize); ZeroMemory(&package, pkg_length); ZeroMemory(&cli_id, cli_id_length); }
-        netObj(SOCKET& _s, sockaddr_in& _a): sock(_s), addr(_a) { addrSize = sizeof(_a); ZeroMemory(&package, pkg_length); ZeroMemory(&cli_id, cli_id_length); }
-        SOCKET sock;
-        sockaddr_in addr;
+        netObj() {
+            addrSize = sizeof(addr);
+            sock = 0;
+#if defined (_WIN32) || defined (_WIN64)
+            ZeroMemory(&addr, addrSize);
+            ZeroMemory(&package, pkg_length);
+            ZeroMemory(&cli_id, cli_id_length);
+#elif defined (__linux__)
+            sock = 0;
+            bzero(&addr, addrSize);
+#endif
+            }
+#if defined (_WIN32) || defined (_WIN64)
         int addrSize;
-        char package[pkg_length];
+        SOCKET sock;
         char cli_id[cli_id_length];
+#elif defined (__linux__)
+        int sock;
+        socklen_t addrSize;
+        char* cli_id;
+#endif
+        sockaddr_in addr;
+        char package[pkg_length];
     };
     void convert_ip();
     void initWinsock();
@@ -37,14 +62,16 @@ private:
     void acceptConn();
     bool sendReq(netObj* cli);
     bool getReq(netObj* cli);
-    bool threadCycle(netObj* cli);
+    void threadCycle(netObj* cli);
     void connChecker();
     std::string port = "48090";
     std::string server_ip = "127.0.0.1";
+#if defined(_WIN32) || defined (_WIN64)
     WSADATA WSAData;
-    netObj srvObj;
     in_addr ip_to_num;
+#endif
+    netObj srvObj;
     std::vector<netObj*> cliObj;
     int opStatus;
-    std::vector<std::future<bool>> connThreads;
+    std::vector<std::future<void>> connThreads;
 };
