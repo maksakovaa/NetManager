@@ -84,7 +84,7 @@ void net::bindSocket()
     srvObj.addr.sin_family = AF_INET;
     srvObj.addr.sin_port = htons(stoi(port));
     srvObj.addrSize = sizeof(srvObj.addr);
-
+    srvObj.thread = std::async(std::launch::async, &net::netManager, this);
 #if defined(_WIN32) || defined(_WIN64)
     opStatus = bind(srvObj.sock, (sockaddr*)&srvObj.addr, srvObj.addrSize);
     if (opStatus != 0)
@@ -129,8 +129,7 @@ void net::servListen()
 #endif
     else
     {
-        std::cout << "Количество подключенных клиентов: " << connThreads.size() << std::endl;
-        std::cout << "Количество данных о клиентах: " << cliObj.size() << std::endl;
+        std::cout << "Количество подключенных клиентов: " << cliObj.size() << std::endl;
         std::cout << "[NET] Ожидание подключений..." << std::endl;
     }
     
@@ -149,11 +148,12 @@ void net::acceptConn()
     }
     else
     {
+        std::lock_guard<std::mutex> lock(m_connThreads);
         cliObj.push_back(client);
         int id = cliObj.size() - 1;
         DWORD dwSizeOfStr = sizeof(cliObj[id]->cli_id);
         WSAAddressToStringA((LPSOCKADDR)&cliObj[id]->addr, cliObj[id]->addrSize, NULL, cliObj[id]->cli_id, &dwSizeOfStr);
-        connThreads.push_back(std::future<void>(std::async(std::launch::async, &net::threadCycle, this, cliObj[id])));
+        cliObj[id]->thread = std::async(std::launch::async, &net::threadCycle, this, cliObj[id]);
         std::cout << "[NET] Соединение успешно установлено" << std::endl;
     }
 #elif defined(__linux__)
@@ -169,7 +169,7 @@ void net::acceptConn()
         cliObj.push_back(client);
         int id = cliObj.size() - 1;
         cliObj[id]->cli_id = inet_ntoa(cliObj[id]->addr.sin_addr);
-        connThreads.push_back(std::future<void>(std::async(std::launch::async, &net::threadCycle, this, cliObj[id])));
+        cliObj[id]->thread = std::async(std::launch::async, &net::threadCycle, this, cliObj[id]);
         std::cout << "[NET] " << *cliObj[id]->cli_id << ":" << cliObj[id]->sock << " Соединение успешно установлено" << std::endl;
     }
 #endif
@@ -236,20 +236,29 @@ void net::threadCycle(netObj* cli)
 
 void net::connChecker()
 {
-    if (!connThreads.empty())
+    if (!cliObj.empty())
     {
-        for (int i = 0; i < connThreads.size(); ++i)
+        std::lock_guard<std::mutex> lock(m_connThreads);
+        for (int i = 0; i < cliObj.size(); ++i)
         {
-            if (connThreads[i].wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+            if (cliObj[i]->thread.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
             {
                 std::vector<netObj*>::iterator delCli = cliObj.begin() + i;
                 std::cout << "Thread for " << (*delCli)->cli_id << ":" << (*delCli)->sock << " ended, removing connection..." << std::endl;
                 delete *delCli;
                 cliObj.erase(delCli);
-                connThreads.erase(connThreads.begin() + i);
                 i--;
             }
         }
+    }
+}
+
+void net::netManager()
+{
+    while (true)
+    {
+        connChecker();
+        std::this_thread::sleep_for(std::chrono::seconds(10));
     }
 }
 
@@ -257,7 +266,6 @@ void net::runServer()
 {
     while (true)
     {
-        connChecker();
 		servListen();
 		acceptConn();
     }

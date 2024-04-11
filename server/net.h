@@ -3,13 +3,14 @@
 #include <string>
 #include <future>
 #include <chrono>
+#include <thread>
+#include <mutex>
 
 #if defined (_WIN32) || defined (_WIN64)
 #include <WinSock2.h>
 #include <ws2tcpip.h>
 #pragma comment (lib, "Ws2_32.lib")
 #pragma comment(lib, "Mswsock.lib")
-
 #elif defined (__linux__)
 #include <string.h>
 #include <unistd.h>
@@ -52,6 +53,7 @@ private:
 #endif
         sockaddr_in addr;
         char package[pkg_length];
+        std::future<void> thread;
     };
     void convert_ip();
     void initWinsock();
@@ -64,6 +66,7 @@ private:
     bool getReq(netObj* cli);
     void threadCycle(netObj* cli);
     void connChecker();
+    void netManager();
     std::string port = "48090";
     std::string server_ip = "127.0.0.1";
 #if defined(_WIN32) || defined (_WIN64)
@@ -73,5 +76,5 @@ private:
     netObj srvObj;
     std::vector<netObj*> cliObj;
     int opStatus;
-    std::vector<std::future<void>> connThreads;
+    std::mutex m_connThreads;
 };
