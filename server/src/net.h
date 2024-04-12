@@ -1,31 +1,15 @@
-#include <iostream>
-#include <vector>
-#include <string>
-#include <future>
-#include <chrono>
-#include <thread>
-#include <mutex>
+#pragma once
+#include "Logger.h"
 
-#if defined (_WIN32) || defined (_WIN64)
-#include <WinSock2.h>
-#include <ws2tcpip.h>
-#pragma comment (lib, "Ws2_32.lib")
-#pragma comment(lib, "Mswsock.lib")
-#elif defined (__linux__)
-#include <string.h>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#endif
+extern Logger Log;
+extern Settings* Config;
 
 class net
 {
-public:
-    net();
-    ~net();
-    void runServer();
+    friend class menu;
 private:
+    bool isShutdown = false;
+    bool statusMainThread = false;
  	static const int pkg_length = 1024;
     static const int cli_id_length = 64;
     struct netObj
@@ -55,7 +39,6 @@ private:
         char package[pkg_length];
         std::future<void> thread;
     };
-    void convert_ip();
     void initWinsock();
     void disconnect();
     void createSocket();
@@ -67,14 +50,20 @@ private:
     void threadCycle(netObj* cli);
     void connChecker();
     void netManager();
-    std::string port = "48090";
-    std::string server_ip = "127.0.0.1";
+    void logger(const std::string& entry);
+    std::string port = Config->getChatPort();;
+    int max_clients = Config->getMaxClients();
 #if defined(_WIN32) || defined (_WIN64)
     WSADATA WSAData;
-    in_addr ip_to_num;
 #endif
     netObj srvObj;
     std::vector<netObj*> cliObj;
     int opStatus;
     std::mutex m_connThreads;
+    std::mutex cout;
+public:
+    net();
+    ~net();
+    void run();
+    void stop();
 };

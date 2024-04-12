@@ -2,46 +2,46 @@
 
 net::net()
 {
-#if defined(_WIN32) || defined(_WIN64)
-    convert_ip();
-    initWinsock();
-#endif
-    createSocket();
-    bindSocket();
-}
 
+}
 net::~net()
 {
     disconnect();
 }
 
 #if defined(_WIN32) || defined(_WIN64)
-void net::convert_ip()
-{
-    opStatus = inet_pton(AF_INET, server_ip.data(), &ip_to_num);
-    if (opStatus <= 0)
-    {
-        std::cout << "[NET] ERROR: Ошибка преобразования IP адреса в специальный цифровой формат." << std::endl;
-        exit(1);
-    }
-}
-
 void net::initWinsock()
 {
     if ((opStatus = WSAStartup(MAKEWORD(2, 2), &WSAData)) != 0)
     {
-        std::cout << "[NET] ERROR: Ошибка инициализации WSAStartup" << std::endl;
+        logger("[NET] ERROR: Ошибка инициализации WSAStartup");
         exit(1);
     }
     else
     {
-        std::cout << "[NET] WSAStartup: " << WSAData.szSystemStatus << std::endl;
+        logger("[NET] WSAStartup: " + std::string(WSAData.szSystemStatus));
     }
 }
 #endif
 
 void net::disconnect()
 {
+    if (!cliObj.empty())
+    {
+        for (int i = 0; i < cliObj.size(); i++)
+        {
+            std::vector<netObj*>::iterator delCli = cliObj.begin() + i;
+#if defined(_WIN32) || defined(_WIN64)
+            closesocket((*delCli)->sock);
+#elif defined(__linux__)
+            close((*delCli)->sock);
+#endif
+            delete *delCli;
+            cliObj.erase(delCli);
+            i--;
+        }
+    }
+    
 #if defined(_WIN32) || defined(_WIN64)
    	closesocket(srvObj.sock);
 	WSACleanup();
@@ -56,83 +56,79 @@ void net::createSocket()
 #if defined(_WIN32) || defined(_WIN64)
     if (srvObj.sock == INVALID_SOCKET)
     {
-        std::cout << "[NET] ERROR: " << WSAGetLastError() << " Ошибка создания сокета." << std::endl;
+        logger("[NET] ERROR: " + std::to_string(WSAGetLastError()) + " Ошибка создания сокета.");
         disconnect();
         exit(1);
     }
 #elif defined(__linux__)    
     if (srvObj.sock == -1)
     {
-        std::cout << "[NET] ERROR: Ошибка создания сокета." << std::endl;
+        logger("[NET] ERROR: Ошибка создания сокета.");
         disconnect();
         exit(1);
     }
 #endif
     else
     {
-        std::cout << "[NET] Инициализация сокета успешна." << std::endl;
+        logger("[NET] Инициализация сокета успешна.");
     }
 }
 
 void net::bindSocket()
 {
-#if defined(_WIN32) || defined(_WIN64)    
-    srvObj.addr.sin_addr = ip_to_num;
-#elif defined(__linux__)
     srvObj.addr.sin_addr.s_addr = htonl(INADDR_ANY);
-#endif
     srvObj.addr.sin_family = AF_INET;
     srvObj.addr.sin_port = htons(stoi(port));
     srvObj.addrSize = sizeof(srvObj.addr);
+
     srvObj.thread = std::async(std::launch::async, &net::netManager, this);
 #if defined(_WIN32) || defined(_WIN64)
     opStatus = bind(srvObj.sock, (sockaddr*)&srvObj.addr, srvObj.addrSize);
     if (opStatus != 0)
     {
-        std::cout << "[NET] ERROR: " << WSAGetLastError() << " Ошибка привязки сокета сервера" << std::endl;
-        disconnect();
-        exit(1);
+        logger("[NET] ERROR: " + std::to_string(WSAGetLastError()) + " Ошибка привязки сокета сервера");
+//        disconnect();
+//        exit(1);
     }
 #elif defined(__linux__)
     opStatus = bind(srvObj.sock, (struct sockaddr*)&srvObj.addr, srvObj.addrSize);
     if (opStatus == -1)
     {
-        std::cout << "[NET] ERROR: Ошибка привязки сокета сервера" << std::endl;
+        logger("[NET] ERROR: Ошибка привязки сокета сервера");
         disconnect();
         exit(1);
     }
 #endif
     else
     {
-        std::cout << "[NET] Привязка сокета выполнена." << std::endl;
+        logger("[NET] Привязка сокета выполнена.");
     }
 }
 
 void net::servListen()
 {
 #if defined(_WIN32) || defined(_WIN64)
-    opStatus = listen(srvObj.sock, SOMAXCONN);    
+    opStatus = listen(srvObj.sock, max_clients);    
     if (opStatus != 0)
     {
-        std::cout << "[NET] ERROR: Ошибка при постановке на приём данных # " << WSAGetLastError() << std::endl;
-        disconnect();
-        exit(1);
+        logger("[NET] ERROR: Ошибка при постановке на приём данных # " + std::to_string(WSAGetLastError()));
+//        disconnect();
+//        exit(1);
     }
 #elif defined(__linux__)
-    opStatus = listen(srvObj.sock, 4096);
+    opStatus = listen(srvObj.sock, max_clients);
     if (opStatus == -1)
     {
-        std::cout << "[NET] ERROR: Ошибка при постановке на приём данных " << std::endl;
+        logger("[NET] ERROR: Ошибка при постановке на приём данных ");
         disconnect();
         exit(1);
     }
 #endif
     else
     {
-        std::cout << "Количество подключенных клиентов: " << cliObj.size() << std::endl;
-        std::cout << "[NET] Ожидание подключений..." << std::endl;
+        logger("[NET] Количество подключенных клиентов: " + std::to_string(cliObj.size()));
+        logger("[NET] Ожидание подключений...");
     }
-    
 }
 
 void net::acceptConn()
@@ -142,9 +138,8 @@ void net::acceptConn()
     client->sock = accept(srvObj.sock, (sockaddr*)&client->addr, &client->addrSize);
     if (client->sock == INVALID_SOCKET)
     {
-        std::cout << "[NET] ERROR: " << WSAGetLastError() << " Сервер несмог принять данные от клиента." << std::endl;
+        logger("[NET] ERROR: " + std::to_string(WSAGetLastError()) + " Сервер несмог принять данные от клиента.");
         closesocket(client->sock);
-        disconnect();
     }
     else
     {
@@ -154,13 +149,13 @@ void net::acceptConn()
         DWORD dwSizeOfStr = sizeof(cliObj[id]->cli_id);
         WSAAddressToStringA((LPSOCKADDR)&cliObj[id]->addr, cliObj[id]->addrSize, NULL, cliObj[id]->cli_id, &dwSizeOfStr);
         cliObj[id]->thread = std::async(std::launch::async, &net::threadCycle, this, cliObj[id]);
-        std::cout << "[NET] Соединение успешно установлено" << std::endl;
+        logger("[NET] Соединение успешно установлено");
     }
 #elif defined(__linux__)
     client->sock = accept(srvObj.sock, (struct sockaddr*)&client->addr, &client->addrSize);
     if (client->sock == -1)
     {
-        std::cout << "[NET] ERROR: Сервер несмог принять данные от клиента." << std::endl;
+        logger("[NET] ERROR: Сервер несмог принять данные от клиента.");
         close(client->sock);
         disconnect();
     }
@@ -170,7 +165,7 @@ void net::acceptConn()
         int id = cliObj.size() - 1;
         cliObj[id]->cli_id = inet_ntoa(cliObj[id]->addr.sin_addr);
         cliObj[id]->thread = std::async(std::launch::async, &net::threadCycle, this, cliObj[id]);
-        std::cout << "[NET] " << *cliObj[id]->cli_id << ":" << cliObj[id]->sock << " Соединение успешно установлено" << std::endl;
+        logger("[NET] " + (std::to_string(*cliObj[id]->cli_id)) + ":" + (std::to_string(cliObj[id]->sock)) + " Соединение успешно установлено");
     }
 #endif
 }
@@ -183,7 +178,7 @@ bool net::sendReq(netObj* cli)
     opStatus = send(cli->sock, cli->package, sizeof(cli->package), 0);
     if (opStatus == SOCKET_ERROR)
     {
-        std::cout << "[NET] ERROR: " << WSAGetLastError() << " Ошибка отправки сообщения клиенту " << cli->cli_id << std::endl;
+        logger("[NET] ERROR: " + std::to_string(WSAGetLastError()) + " Ошибка отправки сообщения клиенту " + cli->cli_id);
         closesocket(cli->sock);
         return false;
     }
@@ -206,7 +201,7 @@ bool net::getReq(netObj* cli)
     opStatus = recv(cli->sock, cli->package, sizeof(cli->package), 0);
     if (opStatus == SOCKET_ERROR)
     {
-        std::cout << "[NET] ERROR: " << WSAGetLastError() << " Ошибка получения сообщения от клиента " << cli->cli_id << std::endl;
+        logger("[NET] ERROR: " + std::to_string(WSAGetLastError()) + " Ошибка получения сообщения от клиента " + cli->cli_id);
         closesocket(cli->sock);
         return false;
     }
@@ -216,7 +211,7 @@ bool net::getReq(netObj* cli)
     opStatus = read(cli->sock, cli->package, sizeof(cli->package));
     if (opStatus < 0)
     {
-        std::cout << "[NET] ERROR: Ошибка получения сообщения от клиента" << std::endl;
+        logger("[NET] ERROR: Ошибка получения сообщения от клиента");
         close(cli->sock);
         return false;
     }
@@ -244,7 +239,7 @@ void net::connChecker()
             if (cliObj[i]->thread.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
             {
                 std::vector<netObj*>::iterator delCli = cliObj.begin() + i;
-                std::cout << "Thread for " << (*delCli)->cli_id << ":" << (*delCli)->sock << " ended, removing connection..." << std::endl;
+                logger("[NET] Thread for " + std::string((*delCli)->cli_id) + ":" + std::to_string((*delCli)->sock) + " ended, removing connection...");
                 delete *delCli;
                 cliObj.erase(delCli);
                 i--;
@@ -255,18 +250,42 @@ void net::connChecker()
 
 void net::netManager()
 {
-    while (true)
+    while (!isShutdown)
     {
         connChecker();
-        std::this_thread::sleep_for(std::chrono::seconds(10));
     }
 }
 
-void net::runServer()
+void net::logger(const std::string& entry)
 {
-    while (true)
+    std::thread write(&Logger::recLogEntry, std::ref(Log), std::cref(entry));
+    write.join();
+}
+
+void net::run()
+{
+    logger("[NET] Запуск сервера...");
+    isShutdown = false;
+    statusMainThread = true;
+    #if defined(_WIN32) || defined(_WIN64)
+    initWinsock();
+#endif
+    createSocket();
+    bindSocket();
+    while (!isShutdown)
     {
-		servListen();
-		acceptConn();
+        servListen();
+        acceptConn();	
     }
+    disconnect();
+    statusMainThread = false;
+    isShutdown = true;
+}
+
+void net::stop()
+{
+    logger("[NET] Выключение сервера...");
+    isShutdown = true;
+    disconnect();
+    logger("[NET] Сервер выключен.");
 }

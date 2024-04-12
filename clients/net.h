@@ -29,7 +29,7 @@ private:
     void getRequest();
     void disconnect();
     std::string server_ip = "127.0.0.1";
-    std::string port = "48090";
+    std::string port = "9999";
    	static const int pkg_length = 1024;
 	char package[pkg_length];
     int opStatus;

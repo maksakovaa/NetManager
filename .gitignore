@@ -1,2 +1,4 @@
 /clients/build
 /server/build
+/server/main_log.txt
+/server/settings.ini

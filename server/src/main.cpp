@@ -1,13 +1,14 @@
-#include "net.h"
-
+#include "menu.h"
 using namespace std;
+
+Logger Log;
+Settings* Config = new Settings;
 
 int main()
 {
 #if defined (_WIN32) || defined (_WIN64)
     system("chcp 65001");
 #endif
-    net server;
-    server.runServer();
+    menu netServer;
     return 0;
 }
