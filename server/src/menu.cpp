@@ -1,64 +1,53 @@
 #include "menu.h"
-menu::menu()
+Menu::Menu()
 {
     menuMain();
 }
-menu::~menu(){}
+Menu::~Menu(){}
 
-void menu::menuMain()
+void Menu::menuMain()
 {
     clearConsole();
     servStatus();
     std::cout << "Главное меню\n\n";
-    std::cout << "1 - Настройки\n";
-    std::cout << "2 - Просмотр подключений\n";
-    std::cout << "3 - Запуск\n";
-    std::cout << "4 - Остановка\n";
-    std::cout << "5 - Обновить\n";
-    std::cout << "6 - Посмотреть лог\n";
-    std::cout << "7 - Выход\n\n";
+    std::cout << "[1] - Настройки\n";
+    std::cout << "[2] - Просмотр подключений\n";
+    std::cout << "[3] - Запуск\n";
+    std::cout << "[4] - Остановка\n";
+    std::cout << "[5] - Обновить\n";
+    std::cout << "[6] - Посмотреть лог\n";
+    std::cout << "[Q] - Выход\n\n";
     std::cin >> choice;
-    switch (choice)
-    {
-    case 1:
-        menuSettings();
-        break;
-    case 2:
-        menuConnections();
-        break;
-    case 3:
-        servRun();
-        break;
-    case 4:
-        servStop();
-        break;
-    case 5:
-        menuMain();
-        break;
-    case 6:
-        menuLogViewer();
-        break;
-    case 7:
-        exit(0);
-        break;    
-    default:
-        break;
-    }
+    checkInput('1', '6', 'q', 'Q');
+    if (choice == '1') { menuSettings(); return; }
+    else if (choice == '2') { menuConnections(); return; }
+    else if (choice == '3') { servRun(); }
+    else if (choice == '4') { servStop(); }
+    else if (choice == '5') { menuMain(); }
+    else if (choice == '6') { menuLogViewer(); }
+    else if (choice == 'Q') { exit(0); }
 }
 
-void menu::menuSettings()
+void Menu::menuSettings()
 {
     clearConsole();
     std::cout << "Текущие настройки:\n\n";
-    std::cout << "Порт: " << srvStruct.Server.port << std::endl;
-    std::cout << "Максимальное количество клиентов: " << srvStruct.Server.max_clients << std::endl;
-    pause();
-    menuMain();
+    std::cout << "[0] Порт: " << Config->getChatPort() << std::endl;
+    std::cout << "[1] Максимальное количество клиентов: " << Config->getMaxClients() << std::endl;
+    std::cout << "[2] MySQL Server ip: " << Config->getMysqlSrvIP() << std::endl;
+    std::cout << "[3] MySQL User: " << Config->getMysqlLogin() << std::endl;
+    std::cout << "[4] MySQL Pass: " << Config->getMysqlPass() << std::endl;
+    std::cout << "'M' - вернуться в главное меню. X - измененить параметр X: \n";
+    std::cin >> choice;
+    checkInput('0', '4', 'm', 'M');
+    if (choice == 'm' || choice == 'M') { menuMain(); return; }
+    else { Config->changeParam(choice); pause(); menuSettings(); }
 }
 
-void menu::menuConnections()
+void Menu::menuConnections()
 {
     clearConsole();
+    servStatus();
     if (srvStruct.Server.cliObj.empty())
     {
         std::cout << "Нет подключенных клиентов.\n";
@@ -66,7 +55,7 @@ void menu::menuConnections()
     else
     {
         std::cout << "Подключенные клиенты:\n";
-        int c = 0;
+        int c = 1;
         for (auto i: srvStruct.Server.cliObj)
         {
             std::cout << c++ << " " << i->cli_id << std::endl;
@@ -77,7 +66,7 @@ void menu::menuConnections()
     menuMain();
 }
 
-void menu::servStatus()
+bool Menu::servStatus()
 {
     std::string status;
     if (srvStruct.Server.statusMainThread)
@@ -86,9 +75,10 @@ void menu::servStatus()
     }
     else status = "Выключен";   
     std::cout << "Статус сервера: \"" << status << "\"" << std::endl;
+    return srvStruct.Server.statusMainThread;
 }
 
-void menu::servRun()
+void Menu::servRun()
 {
     if (srvStruct.Server.statusMainThread)
     {
@@ -98,12 +88,12 @@ void menu::servRun()
     }
     else
     {
-        srvStruct.ServThread = std::async(std::launch::async, &net::run, &srvStruct.Server);
+        srvStruct.ServThread = std::async(std::launch::async, &Net::run, &srvStruct.Server);
         menuMain();
     }
 }
 
-void menu::servStop()
+void Menu::servStop()
 {
     if (!srvStruct.Server.statusMainThread)
     {
@@ -118,15 +108,15 @@ void menu::servStop()
     }
 }
 
-void menu::menuLogViewer()
+void Menu::menuLogViewer()
 {
     clearConsole();
-    Log.readAllEntry();
+    Log->readAllEntry();
     pause();
     menuMain();
 }
 
-void menu::clearConsole()
+void Menu::clearConsole()
 {
 #if defined(_WIN32) || defined(_WIN64)
     system("cls");
@@ -135,7 +125,7 @@ void menu::clearConsole()
 #endif    
 }
 
-void menu::pause()
+void Menu::pause()
 {
 #if defined(_WIN32) || defined(_WIN64)
     system("pause");
@@ -144,7 +134,7 @@ void menu::pause()
 #endif
 }
 
-void menu::exitApp()
+void Menu::exitApp()
 {
 
 }

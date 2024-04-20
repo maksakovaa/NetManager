@@ -8,7 +8,6 @@
 #include <future>
 #include <chrono>
 #include <thread>
-//#include <mutex>
 #include <shared_mutex>
 
 
@@ -44,6 +43,7 @@ public:
 	const std::string& getMysql_table_AM();
 	const std::string& getMysql_table_AMS();
 	const std::string& getMysql_table_PM();
+	void changeParam(int param);
 private:
 	void saveConfig();
 	std::string& getValue(std::string& str);
@@ -61,6 +61,6 @@ private:
 #if defined (_WIN32) || defined (_WIN64)
 	std::string cfgPath = "settings.ini";
 #elif defined (__linux__)
-	std::string cfgPath = "/var/lib/chatd/settings.ini";
+	std::string cfgPath = "./settings.ini";
 #endif
 };

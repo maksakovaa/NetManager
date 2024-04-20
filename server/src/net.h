@@ -1,20 +1,20 @@
 #pragma once
 #include "Logger.h"
 
-extern Logger Log;
+extern Logger* Log;
 extern Settings* Config;
 
-class net
+class Net
 {
-    friend class menu;
+    friend class Menu;
 private:
     bool isShutdown = false;
     bool statusMainThread = false;
  	static const int pkg_length = 1024;
     static const int cli_id_length = 64;
-    struct netObj
+    struct NetObj
     {
-        netObj() {
+        NetObj() {
             addrSize = sizeof(addr);
             sock = 0;
 #if defined (_WIN32) || defined (_WIN64)
@@ -45,25 +45,24 @@ private:
     void bindSocket();
     void servListen();
     void acceptConn();
-    bool sendReq(netObj* cli);
-    bool getReq(netObj* cli);
-    void threadCycle(netObj* cli);
-    void connChecker();
+    bool sendReq(NetObj* cli);
+    bool getReq(NetObj* cli);
+    void threadCycle(NetObj* cli);
     void netManager();
     void logger(const std::string& entry);
-    std::string port = Config->getChatPort();;
-    int max_clients = Config->getMaxClients();
+    std::string port;
+    int max_clients;
 #if defined(_WIN32) || defined (_WIN64)
     WSADATA WSAData;
 #endif
-    netObj srvObj;
-    std::vector<netObj*> cliObj;
+    NetObj srvObj;
+    std::vector<NetObj*> cliObj;
     int opStatus;
     std::mutex m_connThreads;
     std::mutex cout;
 public:
-    net();
-    ~net();
+    Net();
+    ~Net();
     void run();
     void stop();
 };

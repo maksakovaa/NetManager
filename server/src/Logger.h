@@ -13,7 +13,7 @@ private:
 	std::string log_file = "main_log.txt";
 	int diff = -2;
 #elif defined (__linux__)
-	std::string log_file = "/var/log/chatd/log.txt";
+	std::string log_file = "./main_log.txt";
 	int diff = -1;
 #endif
 	std::fstream slog;

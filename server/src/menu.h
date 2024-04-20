@@ -1,11 +1,11 @@
 #pragma once
 #include "net.h"
-class menu
+class Menu
 {
 private:
     struct server
     {
-        net Server;
+        Net Server;
         std::future<void> ServThread;
     };
     server srvStruct;
@@ -13,14 +13,27 @@ private:
     void menuSettings();
     void menuConnections();
     void menuLogViewer();
-    void servStatus();
+    bool servStatus();
     void servRun();
     void servStop();
     void exitApp();
     void pause();
     void clearConsole();
-    int choice;
+    char choice;
+    template<typename... Args>
+    void checkInput(char from, char to, Args... args);
 public:
-    menu();
-    ~menu();
+    Menu();
+    ~Menu();
 };
+
+template<typename... Args> void Menu::checkInput(char from, char to, Args... args)
+{
+    if (!(choice >= from && choice <= to) && ([&]{return choice != args;}()&& ...))
+    {
+        std::cin.clear();
+        std::cin.ignore((std::numeric_limits<std::streamsize>::max)(), '\n');
+        std::cout << "Некорректный ввод, повторите:\n";
+        std::cin >> choice;
+    }
+}

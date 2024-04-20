@@ -72,7 +72,7 @@ Settings::Settings()
 	{
 		mysql_srv_ip = "127.0.0.1";
 		mysql_login = "root";
-		mysql_pass = "YrZBQJIijJ9W0mlpqrj4";
+		mysql_pass = "$y^H\\XO^T5TUHS|;Aw?i";
 		mysql_database = "console_chat";
 		mysql_table_users = "users";
 		mysql_table_AM = "messages";
@@ -165,4 +165,44 @@ void Settings::saveConfig()
 std::string& Settings::getValue(std::string& str)
 {
 	return str.erase(0, str.find(delim_settings) + delim_settings.length());
+}
+
+void Settings::changeParam(int param)
+{
+	std::string temp;
+	if (param == '0')
+	{
+		std::cout << "Введите новое значение:" << std::endl;
+		std::cin >> temp;
+		if (stoi(temp) >= 0 && stoi(temp) <= 65536)
+		{
+			chat_port = temp;
+			saveConfig();
+			std::cout << "Новое значение: " << temp << std::endl;
+		}
+		else
+		{
+			std::cout << "Некорректное значениие. Попробуйте ещё раз." << std::endl;
+		}
+	}
+	else if (param == '1')
+	{
+		std::cout << "Введите новое значение:" << std::endl;
+		std::cin >> temp;
+		if (stoi(temp) >= 1 && stoi(temp) <= 4096)
+		{
+			max_clients = stoi(temp);
+			saveConfig();
+			std::cout << "Новое значение: " << temp << std::endl;
+		}
+		else
+		{
+			std::cout << "Некорректное значениие. Попробуйте ещё раз." << std::endl;
+		}	
+	}
+	else
+	{
+		std::cout << "Not available now. Watch for updates." << std::endl;
+	}
+
 }

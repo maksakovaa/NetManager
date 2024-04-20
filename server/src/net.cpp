@@ -1,21 +1,20 @@
 #include "net.h"
 
-net::net()
+Net::Net()
 {
 
 }
-net::~net()
+Net::~Net()
 {
     disconnect();
 }
 
 #if defined(_WIN32) || defined(_WIN64)
-void net::initWinsock()
+void Net::initWinsock()
 {
     if ((opStatus = WSAStartup(MAKEWORD(2, 2), &WSAData)) != 0)
     {
         logger("[NET] ERROR: Ошибка инициализации WSAStartup");
-        exit(1);
     }
     else
     {
@@ -24,13 +23,13 @@ void net::initWinsock()
 }
 #endif
 
-void net::disconnect()
+void Net::disconnect()
 {
     if (!cliObj.empty())
     {
         for (int i = 0; i < cliObj.size(); i++)
         {
-            std::vector<netObj*>::iterator delCli = cliObj.begin() + i;
+            std::vector<NetObj*>::iterator delCli = cliObj.begin() + i;
 #if defined(_WIN32) || defined(_WIN64)
             closesocket((*delCli)->sock);
 #elif defined(__linux__)
@@ -50,7 +49,7 @@ void net::disconnect()
 #endif
 }
 
-void net::createSocket()
+void Net::createSocket()
 {
     srvObj.sock = socket(AF_INET, SOCK_STREAM, 0);
 #if defined(_WIN32) || defined(_WIN64)
@@ -74,29 +73,25 @@ void net::createSocket()
     }
 }
 
-void net::bindSocket()
+void Net::bindSocket()
 {
     srvObj.addr.sin_addr.s_addr = htonl(INADDR_ANY);
     srvObj.addr.sin_family = AF_INET;
     srvObj.addr.sin_port = htons(stoi(port));
     srvObj.addrSize = sizeof(srvObj.addr);
 
-    srvObj.thread = std::async(std::launch::async, &net::netManager, this);
+    srvObj.thread = std::async(std::launch::async, &Net::netManager, this);
 #if defined(_WIN32) || defined(_WIN64)
     opStatus = bind(srvObj.sock, (sockaddr*)&srvObj.addr, srvObj.addrSize);
     if (opStatus != 0)
     {
         logger("[NET] ERROR: " + std::to_string(WSAGetLastError()) + " Ошибка привязки сокета сервера");
-//        disconnect();
-//        exit(1);
     }
 #elif defined(__linux__)
     opStatus = bind(srvObj.sock, (struct sockaddr*)&srvObj.addr, srvObj.addrSize);
     if (opStatus == -1)
     {
         logger("[NET] ERROR: Ошибка привязки сокета сервера");
-        disconnect();
-        exit(1);
     }
 #endif
     else
@@ -105,15 +100,14 @@ void net::bindSocket()
     }
 }
 
-void net::servListen()
+void Net::servListen()
 {
 #if defined(_WIN32) || defined(_WIN64)
     opStatus = listen(srvObj.sock, max_clients);    
     if (opStatus != 0)
     {
         logger("[NET] ERROR: Ошибка при постановке на приём данных # " + std::to_string(WSAGetLastError()));
-//        disconnect();
-//        exit(1);
+        disconnect();
     }
 #elif defined(__linux__)
     opStatus = listen(srvObj.sock, max_clients);
@@ -121,7 +115,6 @@ void net::servListen()
     {
         logger("[NET] ERROR: Ошибка при постановке на приём данных ");
         disconnect();
-        exit(1);
     }
 #endif
     else
@@ -131,9 +124,9 @@ void net::servListen()
     }
 }
 
-void net::acceptConn()
+void Net::acceptConn()
 {
-    netObj* client = new netObj();
+    NetObj* client = new NetObj();
 #if defined(_WIN32) || defined(_WIN64)
     client->sock = accept(srvObj.sock, (sockaddr*)&client->addr, &client->addrSize);
     if (client->sock == INVALID_SOCKET)
@@ -148,7 +141,7 @@ void net::acceptConn()
         int id = cliObj.size() - 1;
         DWORD dwSizeOfStr = sizeof(cliObj[id]->cli_id);
         WSAAddressToStringA((LPSOCKADDR)&cliObj[id]->addr, cliObj[id]->addrSize, NULL, cliObj[id]->cli_id, &dwSizeOfStr);
-        cliObj[id]->thread = std::async(std::launch::async, &net::threadCycle, this, cliObj[id]);
+        cliObj[id]->thread = std::async(std::launch::async, &Net::threadCycle, this, cliObj[id]);
         logger("[NET] Соединение успешно установлено");
     }
 #elif defined(__linux__)
@@ -164,13 +157,13 @@ void net::acceptConn()
         cliObj.push_back(client);
         int id = cliObj.size() - 1;
         cliObj[id]->cli_id = inet_ntoa(cliObj[id]->addr.sin_addr);
-        cliObj[id]->thread = std::async(std::launch::async, &net::threadCycle, this, cliObj[id]);
+        cliObj[id]->thread = std::async(std::launch::async, &Net::threadCycle, this, cliObj[id]);
         logger("[NET] " + (std::to_string(*cliObj[id]->cli_id)) + ":" + (std::to_string(cliObj[id]->sock)) + " Соединение успешно установлено");
     }
 #endif
 }
 
-bool net::sendReq(netObj* cli)
+bool Net::sendReq(NetObj* cli)
 {
     strcpy(cli->package, "test_send_request");
 
@@ -194,7 +187,7 @@ bool net::sendReq(netObj* cli)
     
 }
 
-bool net::getReq(netObj* cli)
+bool Net::getReq(NetObj* cli)
 {
 #if defined (_WIN32) || defined (_WIN64)
     ZeroMemory(&cli->package, sizeof(cli->package));
@@ -219,7 +212,7 @@ bool net::getReq(netObj* cli)
 #endif
 }
 
-void net::threadCycle(netObj* cli)
+void Net::threadCycle(NetObj* cli)
 {
     bool online = true;
     while (online)
@@ -229,44 +222,46 @@ void net::threadCycle(netObj* cli)
 	}
 }
 
-void net::connChecker()
-{
-    if (!cliObj.empty())
-    {
-        std::lock_guard<std::mutex> lock(m_connThreads);
-        for (int i = 0; i < cliObj.size(); ++i)
-        {
-            if (cliObj[i]->thread.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-            {
-                std::vector<netObj*>::iterator delCli = cliObj.begin() + i;
-                logger("[NET] Thread for " + std::string((*delCli)->cli_id) + ":" + std::to_string((*delCli)->sock) + " ended, removing connection...");
-                delete *delCli;
-                cliObj.erase(delCli);
-                i--;
-            }
-        }
-    }
-}
-
-void net::netManager()
+void Net::netManager()
 {
     while (!isShutdown)
     {
-        connChecker();
+        if (!cliObj.empty())
+        {
+            std::lock_guard<std::mutex> lock(m_connThreads);
+            for (int i = 0; i < cliObj.size(); ++i)
+            {
+                if (cliObj[i]->thread.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+                {
+                    std::vector<NetObj*>::iterator delCli = cliObj.begin() + i;
+#if defined(_WIN32) || defined(_WIN64)
+                    logger("[NET] Thread for " + std::string((*delCli)->cli_id) + ":" + std::to_string((*delCli)->sock) + " ended, removing connection...");
+#elif defined(__linux__)
+                    logger("[NET] Thread for " + std::string((*delCli)->cli_id) + " ended");
+#endif
+                    delete *delCli;
+                    cliObj.erase(delCli);
+                    i--;
+                }
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(5));
     }
 }
 
-void net::logger(const std::string& entry)
+void Net::logger(const std::string& entry)
 {
     std::thread write(&Logger::recLogEntry, std::ref(Log), std::cref(entry));
     write.join();
 }
 
-void net::run()
+void Net::run()
 {
     logger("[NET] Запуск сервера...");
     isShutdown = false;
     statusMainThread = true;
+    port = Config->getChatPort();
+    max_clients = Config->getMaxClients();
     #if defined(_WIN32) || defined(_WIN64)
     initWinsock();
 #endif
@@ -282,7 +277,7 @@ void net::run()
     isShutdown = true;
 }
 
-void net::stop()
+void Net::stop()
 {
     logger("[NET] Выключение сервера...");
     isShutdown = true;
