@@ -3,6 +3,7 @@ using namespace std;
 
 Logger* Log = new Logger;
 Settings* Config = new Settings;
+ReqAPI* API = new ReqAPI; 
 
 int main()
 {

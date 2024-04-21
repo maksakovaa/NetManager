@@ -16,12 +16,14 @@
 #include <ws2tcpip.h>
 #pragma comment (lib, "Ws2_32.lib")
 #pragma comment(lib, "Mswsock.lib")
+#include <mysql>
 #elif defined (__linux__)
 #include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <mysql/mysql.h>
 #endif
 
 std::string curDateTime();

@@ -218,6 +218,7 @@ void Net::threadCycle(NetObj* cli)
     while (online)
 	{
 		online = getReq(cli);
+        reqHandler(cli);
 		online = sendReq(cli);
 	}
 }
@@ -283,4 +284,9 @@ void Net::stop()
     isShutdown = true;
     disconnect();
     logger("[NET] Сервер выключен.");
+}
+
+void Net::reqHandler(NetObj* cli)
+{
+    API->spellOut(cli->package);
 }

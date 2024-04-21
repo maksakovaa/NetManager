@@ -1,8 +1,9 @@
 #pragma once
-#include "Logger.h"
+#include "reqAPI.h"
 
 extern Logger* Log;
 extern Settings* Config;
+extern ReqAPI* API;
 
 class Net
 {
@@ -39,6 +40,15 @@ private:
         char package[pkg_length];
         std::future<void> thread;
     };
+    std::string port;
+    int max_clients;
+#if defined(_WIN32) || defined (_WIN64)
+    WSADATA WSAData;
+#endif
+    NetObj srvObj;
+    std::vector<NetObj*> cliObj;
+    int opStatus;
+    std::mutex m_connThreads;
     void initWinsock();
     void disconnect();
     void createSocket();
@@ -50,16 +60,7 @@ private:
     void threadCycle(NetObj* cli);
     void netManager();
     void logger(const std::string& entry);
-    std::string port;
-    int max_clients;
-#if defined(_WIN32) || defined (_WIN64)
-    WSADATA WSAData;
-#endif
-    NetObj srvObj;
-    std::vector<NetObj*> cliObj;
-    int opStatus;
-    std::mutex m_connThreads;
-    std::mutex cout;
+    void reqHandler(NetObj* cli);
 public:
     Net();
     ~Net();
